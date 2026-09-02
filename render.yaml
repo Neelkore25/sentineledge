@@ -1,0 +1,30 @@
+﻿services:
+  # 1. FastAPI Backend API
+  - type: web
+    name: sentineledge-api
+    runtime: python
+    buildCommand: pip install -r apps/api/requirements.txt
+    startCommand: python -m uvicorn apps.api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: CORRELATION_WINDOW_MINUTES
+        value: "30"
+      - key: AI_PROVIDER
+        value: local
+
+  # 2. Next.js Frontend Web Application
+  - type: web
+    name: sentineledge-web
+    runtime: node
+    rootDir: apps/web
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.17.0
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: sentineledge-api
+          property: host
