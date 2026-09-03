@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 
 # Ensure repository root and api directory are on sys.path
@@ -62,13 +62,15 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS Middleware configuration
+# CORS Middleware configuration - Supports production Vercel, Render, GitHub Pages, and local dev
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Register API Routers

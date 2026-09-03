@@ -1,4 +1,4 @@
-﻿import os
+import os
 
 def write_file(path, content):
     d = os.path.dirname(path)

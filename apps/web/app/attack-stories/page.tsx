@@ -41,7 +41,7 @@ const attackStories = [
   }
 ];
 
-export function AttackStoriesPage() {
+export default function AttackStoriesPage() {
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
       <div className="border-b border-editorial-border pb-4">
@@ -91,5 +91,3 @@ export function AttackStoriesPage() {
     </div>
   );
 }
-
-export default AttackStoriesPage;

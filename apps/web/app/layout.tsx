@@ -1,4 +1,4 @@
-﻿import './globals.css';
+import './globals.css';
 import { AppProvider } from '@/lib/store';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';

@@ -90,6 +90,37 @@ export interface Scenario {
   target_user?: string | null;
 }
 
+export interface UserBaseline {
+  id: string;
+  username: string;
+  full_name: string;
+  role: string;
+  typical_login_hours: string;
+  typical_locations: string[];
+  typical_devices: string[];
+  avg_daily_logins: number;
+  avg_download_mb: number;
+  download_history: number[];
+  baseline_evaluation: {
+    s_behavior: number;
+    z_mad_download: number;
+    z_mad_login_time: number;
+    anomalous: boolean;
+    anomalies: string[];
+  };
+}
+
+export interface DetectionRule {
+  rule_id: string;
+  name: string;
+  description: string;
+  severity: string;
+  r_rule: number;
+  attack_category: string;
+  enabled: boolean;
+  threshold?: number | null;
+}
+
 export interface RecoveryInventoryItem {
   id: string;
   asset_id: string;

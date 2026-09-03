@@ -1,4 +1,4 @@
-﻿services:
+services:
   # 1. FastAPI Backend API
   - type: web
     name: sentineledge-api
