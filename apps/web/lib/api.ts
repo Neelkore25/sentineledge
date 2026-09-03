@@ -106,6 +106,12 @@ export const api = {
   },
   getEventById: (id: string) => fetcher<SecurityEvent>(`/telemetry/${id}`),
 
+  ingestCustomTelemetry: (events: any[]) =>
+    fetcher<any>('/telemetry/batch', {
+      method: 'POST',
+      body: JSON.stringify(events)
+    }),
+
   // Incidents
   getIncidents: (params?: { status?: string; severity?: string; search?: string }) => {
     const query = new URLSearchParams(params as Record<string, string>).toString();
