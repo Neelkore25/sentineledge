@@ -7,35 +7,24 @@ import {
   Shield,
   AlertTriangle,
   Activity,
-  GitCommit,
-  FlaskConical,
-  Binary,
-  UserCheck,
-  RotateCcw,
   Sparkles,
+  Binary,
+  RotateCcw,
   FileText,
   History,
-  BookOpen,
-  Settings,
-  Flame,
-  Layers
+  Settings
 } from 'lucide-react';
 import { useApp } from '@/lib/store';
 
 const navItems = [
-  { name: 'Overview', href: '/dashboard', icon: Activity, section: 'Core' },
-  { name: 'Incidents', href: '/incidents', icon: AlertTriangle, section: 'Core' },
-  { name: 'Events', href: '/events', icon: Layers, section: 'Core' },
-  { name: 'Attack Stories', href: '/attack-stories', icon: GitCommit, section: 'Core' },
-  { name: 'Simulation Lab', href: '/simulation', icon: FlaskConical, badge: 'Interactive', section: 'Operations' },
-  { name: 'Detection Rules', href: '/detections', icon: Binary, section: 'Operations' },
-  { name: 'Behavior', href: '/behavior', icon: UserCheck, section: 'Operations' },
-  { name: 'Recovery', href: '/recovery', icon: RotateCcw, section: 'Resilience' },
-  { name: 'AI Investigator', href: '/ai-investigator', icon: Sparkles, badge: 'Grounded', section: 'Intelligence' },
-  { name: 'Reports', href: '/reports', icon: FileText, section: 'Intelligence' },
-  { name: 'Audit Log', href: '/audit', icon: History, section: 'Governance' },
-  { name: 'Research Hub', href: '/research', icon: BookOpen, section: 'Research' },
-  { name: 'Settings', href: '/settings', icon: Settings, section: 'System' },
+  { name: 'Overview', href: '/dashboard', icon: Activity },
+  { name: 'Analyze Data', href: '/analyze', icon: Sparkles, badge: 'Analyze' },
+  { name: 'Incidents', href: '/incidents', icon: AlertTriangle },
+  { name: 'AI Investigator', href: '/ai-investigator', icon: Binary },
+  { name: 'Recovery Posture', href: '/recovery', icon: RotateCcw },
+  { name: 'Incident Reports', href: '/reports', icon: FileText },
+  { name: 'Audit Ledger', href: '/audit', icon: History },
+  { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
 export function Sidebar() {
@@ -47,7 +36,7 @@ export function Sidebar() {
       <div>
         {/* Brand Header */}
         <div className="p-4 border-b border-editorial-border flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 group">
+          <Link href="/dashboard" className="flex items-center gap-2.5 group">
             <div className="w-8 h-8 rounded bg-editorial-accent text-white flex items-center justify-center font-bold tracking-tight shadow-sm group-hover:scale-105 transition-transform">
               <Shield className="w-4 h-4" />
             </div>
@@ -56,7 +45,7 @@ export function Sidebar() {
                 SentinelEdge
                 <span className="text-[10px] uppercase font-mono px-1 py-0.2 rounded bg-editorial-panel text-editorial-muted border border-editorial-border">v1.0</span>
               </div>
-              <div className="text-[11px] text-editorial-muted leading-none">Cyber-Resilience Lab</div>
+              <div className="text-[11px] text-editorial-muted leading-none">Security Telemetry & Investigation</div>
             </div>
           </Link>
         </div>
@@ -70,7 +59,7 @@ export function Sidebar() {
         </div>
 
         {/* Navigation List */}
-        <nav className="p-2 space-y-0.5 overflow-y-auto max-h-[calc(100vh-210px)]">
+        <nav className="p-2 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
             const Icon = item.icon;
@@ -78,7 +67,7 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center justify-between px-3 py-2 rounded text-xs font-medium transition-colors ${
+                className={`flex items-center justify-between px-3 py-2.5 rounded text-xs font-medium transition-colors ${
                   isActive
                     ? 'bg-editorial-panel text-editorial-text font-semibold border border-editorial-border shadow-xs'
                     : 'text-editorial-muted hover:text-editorial-text hover:bg-editorial-panel/40'
@@ -89,7 +78,7 @@ export function Sidebar() {
                   <span>{item.name}</span>
                 </div>
                 {item.badge && (
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-editorial-panel border border-editorial-border text-editorial-accent">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-editorial-panel border border-editorial-border text-editorial-accent font-semibold">
                     {item.badge}
                   </span>
                 )}
@@ -103,12 +92,12 @@ export function Sidebar() {
       <div className="p-3 border-t border-editorial-border bg-editorial-surface text-xs">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-status-healthy animate-pulse" />
+            <div className="w-2 h-2 rounded-full bg-status-healthy" />
             <span className="text-editorial-muted">Role:</span>
             <span className="font-mono font-medium text-editorial-text">{userRole}</span>
           </div>
           <span className="text-[10px] font-mono text-editorial-muted bg-editorial-panel px-1.5 py-0.5 rounded border border-editorial-border">
-            PROTOTYPE
+            ENGINE ACTIVE
           </span>
         </div>
       </div>

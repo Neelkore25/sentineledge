@@ -7,7 +7,9 @@ import {
   ArrowLeft,
   Sparkles,
   ShieldCheck,
-  Layers
+  Layers,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Incident, SecurityEvent } from '@/lib/types';
@@ -23,6 +25,7 @@ export default function IncidentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(false);
   const [isResponseOpen, setIsResponseOpen] = useState(false);
+  const [showTechnicalMath, setShowTechnicalMath] = useState(false);
 
   const loadDetails = async () => {
     try {
@@ -45,8 +48,8 @@ export default function IncidentDetailPage() {
       setAiLoading(true);
       await api.investigateIncidentAI(id);
       await loadDetails();
-    } catch (err) {
-      alert(`AI investigation failed: ${err}`);
+    } catch (err: any) {
+      alert(`AI investigation failed: ${err.message || err}`);
     } finally {
       setAiLoading(false);
     }
@@ -100,15 +103,15 @@ export default function IncidentDetailPage() {
             disabled={aiLoading}
             className="flex items-center gap-2 px-3.5 py-2 rounded bg-editorial-panel border border-editorial-border text-xs font-bold text-editorial-text hover:bg-editorial-panel/80 transition-colors"
           >
-            <Sparkles className="w-3.5 h-3.5 text-editorial-accent" />
-            {aiLoading ? 'Analyzing Evidence...' : 'Re-Run AI Investigator'}
+            <Sparkles className={`w-3.5 h-3.5 text-editorial-accent ${aiLoading ? 'animate-spin' : ''}`} />
+            {aiLoading ? 'Analyzing Evidence...' : 'Re-Run AI Assessment'}
           </button>
           <button
             onClick={() => setIsResponseOpen(true)}
             className="flex items-center gap-2 px-4 py-2 rounded bg-editorial-accent text-white font-bold text-xs shadow-xs hover:opacity-90 transition-opacity"
           >
             <ShieldCheck className="w-4 h-4" />
-            Respond & Remediate
+            Record Analyst Response
           </button>
         </div>
       </div>
@@ -133,16 +136,26 @@ export default function IncidentDetailPage() {
               </span>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <span className="font-mono text-[10px] uppercase text-editorial-muted">PRIMARY HYPOTHESIS</span>
+            <div className="space-y-4 text-xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono uppercase text-editorial-accent font-bold px-1.5 py-0.5 rounded bg-editorial-accent/10 border border-editorial-accent/30">
+                    AI HYPOTHESIS
+                  </span>
+                  <span className="text-[11px] text-editorial-muted font-mono">(Probabilistic Assessment)</span>
+                </div>
                 <p className="font-medium text-editorial-text mt-0.5">
                   {incident.ai_hypothesis || 'Probable credential compromise followed by administrative elevation.'}
                 </p>
               </div>
 
-              <div>
-                <span className="font-mono text-[10px] uppercase text-editorial-muted">EVIDENCE CITATIONS (GROUNDED LOGS)</span>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono uppercase text-status-healthy font-bold px-1.5 py-0.5 rounded bg-status-healthy/10 border border-status-healthy/30">
+                    OBSERVED EVIDENCE
+                  </span>
+                  <span className="text-[11px] text-editorial-muted font-mono">(Direct Telemetry Facts)</span>
+                </div>
                 <div className="mt-1 p-2.5 rounded bg-editorial-panel border border-editorial-border text-editorial-text space-y-1 font-mono text-[11px]">
                   <div>• {incident.description}</div>
                   <div>• Citing correlated Event IDs: {incident.event_ids.join(', ')}</div>
@@ -208,6 +221,33 @@ export default function IncidentDetailPage() {
             compositeScore={incident.risk_score}
             severityBand={incident.severity}
           />
+
+          {/* Expandable Technical Math Accordion */}
+          <div className="border border-editorial-border rounded-xl bg-editorial-surface p-4 shadow-xs text-xs space-y-3">
+            <button
+              onClick={() => setShowTechnicalMath(!showTechnicalMath)}
+              className="w-full flex items-center justify-between font-bold text-editorial-text hover:text-editorial-accent transition-colors"
+            >
+              <span>Technical Formula & Sub-Score Details</span>
+              {showTechnicalMath ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+
+            {showTechnicalMath && (
+              <div className="pt-2 border-t border-editorial-border space-y-2 font-mono text-[11px] text-editorial-muted animate-in fade-in">
+                <div className="p-2 rounded bg-editorial-panel border border-editorial-border">
+                  <strong className="text-editorial-text">Formula:</strong>
+                  <div className="mt-1">Risk = 0.25·R + 0.20·S + 0.20·C + 0.20·A + 0.15·B</div>
+                </div>
+                <ul className="space-y-1 list-disc list-inside">
+                  <li>R_rule: {incident.risk_breakdown?.r_rule ?? 75}/100</li>
+                  <li>S_behavior (MAD): {incident.risk_breakdown?.s_behavior ?? 68}/100</li>
+                  <li>C_correlation: {incident.risk_breakdown?.c_correlation ?? 80}/100</li>
+                  <li>A_criticality: {incident.risk_breakdown?.a_criticality ?? 100}/100</li>
+                  <li>B_impact: {incident.risk_breakdown?.b_impact ?? 88}/100</li>
+                </ul>
+              </div>
+            )}
+          </div>
 
           <div className="border border-editorial-border rounded-lg bg-editorial-surface p-5 shadow-xs space-y-3 text-xs">
             <h4 className="font-bold text-editorial-text border-b border-editorial-border pb-2">Business & Asset Context</h4>

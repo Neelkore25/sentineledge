@@ -12,7 +12,7 @@ from apps.api.schemas.event import SecurityEventResponse, SecurityEventCreate
 from apps.api.engine.rules import evaluate_all_rules
 from apps.api.engine.anomaly import evaluate_user_behavior
 from apps.api.engine.correlation import EventCorrelator
-from apps.api.engine.impact import normalize_business_impact, calculate_business_impact_tier
+from apps.api.engine.impact import normalize_asset_criticality, normalize_business_impact, calculate_business_impact_tier
 from apps.api.engine.risk import calculate_explainable_risk
 
 router = APIRouter(prefix="/telemetry", tags=["telemetry"])
@@ -158,35 +158,44 @@ def ingest_batch_events(events_in: List[SecurityEventCreate], db: Session = Depe
     
     db.commit()
     
-    target_asset = next((e.asset_id for e in created_events if e.asset_id), "asset-prod-db-01")
+    target_asset = next((e.asset_id for e in created_events if e.asset_id), "ASSET_CUSTOMER_DB")
     target_user = next((e.user_id for e in created_events if e.user_id), "sarah_connor")
+    target_ip = next((e.source_ip for e in created_events if e.source_ip), "10.20.0.1")
     
     # 1. Rule evaluation
     rule_results = evaluate_all_rules(dict_events)
     r_rule = max([r["r_rule"] for r in rule_results]) if rule_results else 30.0
     
-    # 2. Behavioral evaluation
-    beh_eval = evaluate_user_behavior(target_user, db, current_event=dict_events[-1] if dict_events else None)
+    # 2. Behavioral evaluation (MAD)
+    now_utc = datetime.now(timezone.utc)
+    max_bytes = max([e.bytes_transferred for e in created_events], default=0)
+    observed_download_mb = max_bytes / (1024 * 1024)
+    user_context = {"download_history_json": [40.0, 42.0, 45.0], "typical_login_start_hour": 9, "typical_login_end_hour": 18}
+    beh_eval = evaluate_user_behavior(observed_download_mb, now_utc.hour, user_context)
     s_behavior = beh_eval["s_behavior"]
     
     # 3. Correlation
     correlator = EventCorrelator()
-    corr_res = correlator.correlate_events(dict_events)
+    corr_res = correlator.correlate_events(dict_events, target_user=target_user, target_ip=target_ip, target_asset=target_asset)
     c_correlation = corr_res["c_correlation"]
     
-    # 4. Criticality
+    # 4. Criticality & Impact
     asset = db.query(Asset).filter(Asset.id == target_asset).first()
-    a_crit = asset.criticality_score if asset else 75.0
-    
-    # 5. Impact
-    b_impact = normalize_business_impact(
-        data_sensitivity="PII / FINANCIAL",
-        estimated_downtime_cost_per_hour=5000.0,
-        user_blast_radius=50
-    )
+    if asset:
+        a_crit = normalize_asset_criticality(asset.criticality)
+        b_impact = normalize_business_impact(
+            data_sensitivity=asset.data_sensitivity,
+            estimated_downtime_cost_per_hour=asset.estimated_downtime_cost_per_hour,
+            user_blast_radius=asset.user_blast_radius
+        )
+        asset_display_name = asset.asset_name
+    else:
+        a_crit = 75.0
+        b_impact = 70.0
+        asset_display_name = target_asset
     impact_tier = calculate_business_impact_tier(b_impact)
     
-    # 6. Composite Risk
+    # 5. Composite Risk
     risk_res = calculate_explainable_risk(
         r_rule=r_rule,
         s_behavior=s_behavior,
@@ -200,7 +209,6 @@ def ingest_batch_events(events_in: List[SecurityEventCreate], db: Session = Depe
     first_ts = min(e.timestamp for e in created_events)
     last_ts = max(e.timestamp for e in created_events)
     
-    now_utc = datetime.now(timezone.utc)
     new_inc = Incident(
         id=inc_id,
         title=f"Custom Telemetry Scan ({len(created_events)} events)",
@@ -211,7 +219,7 @@ def ingest_batch_events(events_in: List[SecurityEventCreate], db: Session = Depe
         detected_at=now_utc,
         first_seen=first_ts,
         last_seen=last_ts,
-        affected_asset=target_asset,
+        affected_asset=asset_display_name,
         affected_user=target_user,
         attack_category="Custom Telemetry Analysis",
         business_impact=impact_tier,

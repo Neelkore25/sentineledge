@@ -40,8 +40,9 @@ class BruteForceRule(DetectionRule):
             return None
         failed_logins = [
             e for e in events 
-            if e.get("event_type") in ("LOGIN_FAILED", "AUTH_FAILURE") 
-            or (e.get("action") == "LOGIN" and e.get("status") in ("FAILURE", "BLOCKED"))
+            if str(e.get("event_type", "")).upper() in ("LOGIN_FAILED", "AUTH_FAILURE") 
+            or (str(e.get("event_type", "")).lower() in ("login_attempt", "login", "auth") and str(e.get("status", "")).upper() in ("FAILURE", "FAILED", "BLOCKED"))
+            or (str(e.get("action", "")).upper() in ("LOGIN", "LOGIN_ATTEMPT") and str(e.get("status", "")).upper() in ("FAILURE", "FAILED", "BLOCKED"))
         ]
         if len(failed_logins) >= self.threshold:
             return {
@@ -70,7 +71,8 @@ class SuspiciousGeoLoginRule(DetectionRule):
         allowed = set(loc.lower() for loc in (allowed_locations or ["mumbai", "bengaluru", "delhi", "internal_vpn"]))
         matched = []
         for e in events:
-            if e.get("event_type") in ("LOGIN_SUCCESS", "AUTH_SUCCESS") and e.get("location"):
+            ev_type = str(e.get("event_type", "")).upper()
+            if ev_type in ("LOGIN_SUCCESS", "AUTH_SUCCESS") and e.get("location"):
                 if e["location"].lower() not in allowed:
                     matched.append(e)
         if matched:
@@ -99,8 +101,12 @@ class PrivilegeEscalationRule(DetectionRule):
             return None
         matched = [
             e for e in events 
-            if e.get("event_type") in ("PRIVILEGE_CHANGE", "ROLE_ASSIGNED_ADMIN", "ADMIN_ACCESS")
-            or (e.get("action") == "GRANT_ROLE" and "admin" in str(e.get("endpoint", "")).lower())
+            if str(e.get("event_type", "")).upper() in ("PRIVILEGE_CHANGE", "ROLE_ASSIGNED_ADMIN", "ADMIN_ACCESS")
+            or (str(e.get("action", "")).upper() == "GRANT_ROLE" and "admin" in str(e.get("endpoint", "")).lower())
+            or str(e.get("event_metadata", {}).get("anomaly_type", "")).lower() == "off_hours_privileged_access"
+            or str(e.get("anomaly_type", "")).lower() == "off_hours_privileged_access"
+            or e.get("is_anomaly") == 1
+            or e.get("event_metadata", {}).get("is_anomaly") == 1
         ]
         if matched:
             return {
@@ -109,7 +115,7 @@ class PrivilegeEscalationRule(DetectionRule):
                 "severity": self.severity,
                 "r_rule": normalize_rule_severity(self.severity),
                 "matched_event_ids": [e["id"] for e in matched if "id" in e],
-                "description": f"Administrative privilege modification event detected."
+                "description": f"Administrative privilege modification event detected ({len(matched)} matches)."
             }
         return None
 

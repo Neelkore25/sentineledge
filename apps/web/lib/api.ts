@@ -130,12 +130,20 @@ export const api = {
       body: JSON.stringify({ action_type, reason, target })
     }),
 
-  // Simulation Lab Scenarios
+  // Simulation Lab Scenarios & Database Controls
   getScenarios: () => fetcher<Scenario[]>('/simulation/scenarios'),
   runScenario: (scenario_key: string) =>
     fetcher<any>('/simulation/run', {
       method: 'POST',
       body: JSON.stringify({ scenario_key })
+    }),
+  resetDatabase: () =>
+    fetcher<{ status: string; message: string }>('/simulation/reset', {
+      method: 'POST'
+    }),
+  seedDemoBreach: () =>
+    fetcher<{ status: string; incident_id: string }>('/simulation/seed-demo', {
+      method: 'POST'
     }),
 
   // Detection Rules

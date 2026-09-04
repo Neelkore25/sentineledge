@@ -1,15 +1,20 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Sliders, Save, CheckCircle2 } from 'lucide-react';
+import { Sliders, Save, CheckCircle2, Trash2, Sparkles, AlertTriangle } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useApp } from '@/lib/store';
+
 
 export default function SettingsPage() {
+  const { triggerRefresh } = useApp();
   const [windowMins, setWindowMins] = useState('30');
   const [bruteThreshold, setBruteThreshold] = useState('5');
   const [aiProvider, setAiProvider] = useState('local');
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [dbAction, setDbAction] = useState<'idle' | 'resetting' | 'seeding'>('idle');
+  const [dbMessage, setDbMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -27,6 +32,35 @@ export default function SettingsPage() {
     }
     load();
   }, []);
+
+  const handleResetDatabase = async () => {
+    if (!window.confirm('This will permanently erase all analyzed events, incidents, and audit logs. System configuration and baselines are preserved.\n\nContinue with reset?')) return;
+    try {
+      setDbAction('resetting');
+      setDbMessage(null);
+      await api.resetDatabase();
+      setDbMessage({ type: 'success', text: 'Database reset. Dashboard is now in clean empty state.' });
+      triggerRefresh();
+    } catch (err: any) {
+      setDbMessage({ type: 'error', text: `Reset failed: ${err.message || err}` });
+    } finally {
+      setDbAction('idle');
+    }
+  };
+
+  const handleSeedDemo = async () => {
+    try {
+      setDbAction('seeding');
+      setDbMessage(null);
+      await api.seedDemoBreach();
+      setDbMessage({ type: 'success', text: 'Synthetic demo breach loaded. Visit Incidents to review INC-DEMO-101.' });
+      triggerRefresh();
+    } catch (err: any) {
+      setDbMessage({ type: 'error', text: `Demo seed failed: ${err.message || err}` });
+    } finally {
+      setDbAction('idle');
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,6 +158,67 @@ export default function SettingsPage() {
           </button>
         </div>
       </form>
+
+      {/* Database Controls */}
+      <div className="border border-editorial-border rounded-xl bg-editorial-surface p-6 shadow-xs space-y-5 text-xs">
+        <div className="border-b border-editorial-border pb-3">
+          <h3 className="font-bold text-sm text-editorial-text">Database State Controls</h3>
+          <p className="text-editorial-muted font-mono text-[11px] mt-0.5">
+            Manage the lifecycle of analyzed data. These operations are irreversible.
+          </p>
+        </div>
+
+        {dbMessage && (
+          <div className={`p-3 rounded-lg border flex items-center gap-2 font-mono text-[11px] ${
+            dbMessage.type === 'success'
+              ? 'bg-status-healthy/10 border-status-healthy/30 text-status-healthy'
+              : 'bg-status-critical/10 border-status-critical/30 text-status-critical'
+          }`}>
+            {dbMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+            <span>{dbMessage.text}</span>
+          </div>
+        )}
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="border border-editorial-border rounded-lg p-4 space-y-3 bg-editorial-panel/40">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-editorial-accent" />
+              <h4 className="font-bold text-editorial-text">Load Synthetic Demo Breach</h4>
+            </div>
+            <p className="text-editorial-muted text-[11px] leading-relaxed">
+              Populates a clearly labeled synthetic multi-stage attack scenario (brute force → privileged access → data exfiltration) for demonstration or testing purposes.
+            </p>
+            <p className="text-[10px] font-mono text-editorial-accent">Incident will be marked: [DEMO] SYNTHETIC DATA</p>
+            <button
+              onClick={handleSeedDemo}
+              disabled={dbAction !== 'idle'}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-editorial-panel border border-editorial-border text-xs font-bold text-editorial-text hover:bg-editorial-panel/80 hover:text-editorial-accent transition-colors shadow-xs w-full justify-center"
+            >
+              <Sparkles className={`w-3.5 h-3.5 text-editorial-accent ${dbAction === 'seeding' ? 'animate-spin' : ''}`} />
+              {dbAction === 'seeding' ? 'Seeding Demo Breach...' : 'Load Demo Breach Scenario'}
+            </button>
+          </div>
+
+          <div className="border border-status-critical/30 rounded-lg p-4 space-y-3 bg-status-critical/5">
+            <div className="flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-status-critical" />
+              <h4 className="font-bold text-editorial-text">Reset to Clean Empty State</h4>
+            </div>
+            <p className="text-editorial-muted text-[11px] leading-relaxed">
+              Permanently removes all analyzed security events, incidents, and audit logs. System configuration, asset catalog, user baselines, and backup SLA records are preserved.
+            </p>
+            <p className="text-[10px] font-mono text-status-critical">⚠ This action cannot be undone.</p>
+            <button
+              onClick={handleResetDatabase}
+              disabled={dbAction !== 'idle'}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-status-critical/10 border border-status-critical/40 text-xs font-bold text-status-critical hover:bg-status-critical/20 transition-colors shadow-xs w-full justify-center"
+            >
+              <Trash2 className={`w-3.5 h-3.5 ${dbAction === 'resetting' ? 'animate-spin' : ''}`} />
+              {dbAction === 'resetting' ? 'Purging Data...' : 'Reset to Clean State'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

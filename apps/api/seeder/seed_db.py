@@ -10,13 +10,20 @@ from apps.api.models.audit import AuditLog
 from apps.api.engine.risk import calculate_explainable_risk
 
 def seed_database(db: Session):
-    # Check if already seeded
+    """
+    Initializes foundational baseline infrastructure records (Assets, User Baselines,
+    Backup SLA Targets, and System Settings).
+    
+    IMPORTANT: Normal production startup starts CLEAN without auto-inserting
+    fake breaches or incidents.
+    """
+    # Check if foundational assets are already initialized
     if db.query(Asset).first():
         return
 
     now = datetime.now(timezone.utc)
 
-    # 1. Assets
+    # 1. Critical Infrastructure Assets (Required for Criticality Scoring)
     assets = [
         Asset(
             id="ASSET_CUSTOMER_DB",
@@ -77,7 +84,7 @@ def seed_database(db: Session):
     for a in assets:
         db.add(a)
 
-    # 2. Users
+    # 2. User Baseline Profiles (Required for MAD Anomaly Detection)
     users = [
         UserEntity(
             id="usr_finance_admin",
@@ -122,7 +129,7 @@ def seed_database(db: Session):
     for u in users:
         db.add(u)
 
-    # 3. Backups
+    # 3. Backup SLA Configurations (Required for Recovery Posture Index)
     backups = [
         BackupInventory(
             id="BK-01",
@@ -181,96 +188,147 @@ def seed_database(db: Session):
         SystemSetting(
             key="correlation_window_minutes",
             value="30",
-            description="Temporal correlation sliding window for grouping related security events (minutes)."
+            description="Sliding window duration for grouping related events into incidents (minutes)."
         ),
         SystemSetting(
             key="brute_force_threshold",
             value="5",
-            description="Minimum failed authentication attempts before triggering RULE_AUTH_BRUTE_FORCE_001."
+            description="Minimum failed login attempts before triggering brute-force detection rule."
         ),
         SystemSetting(
             key="data_exfil_threshold_mb",
             value="500",
-            description="Byte threshold in MB for triggering RULE_EXFIL_SPIKE_004."
+            description="Byte threshold in MB for flagging anomalous large data export spikes."
         ),
         SystemSetting(
             key="ai_provider",
             value="local",
-            description="Selected AI investigation provider (local | openai | gemini | anthropic)."
+            description="AI investigation provider (local deterministic | openai | gemini)."
         )
     ]
     for s in settings_records:
         db.add(s)
 
-    # 5. Initial Seed Incident
+    db.commit()
+    print("Initialized foundational assets, user baselines, and backup configurations (Clean state).")
+
+def reset_to_clean_state(db: Session):
+    """Purges all security events, incidents, and non-system audit records."""
+    db.query(Incident).delete()
+    db.query(SecurityEvent).delete()
+    db.query(AuditLog).delete()
+    
+    # Add clean reset audit record
+    now = datetime.now(timezone.utc)
+    db.add(AuditLog(
+        id="AUD-RESET-01",
+        timestamp=now,
+        actor="Security Administrator",
+        role="Admin",
+        action="DATABASE_RESET",
+        resource="System Database",
+        reason="System reset to clean empty state (all events and incidents purged)."
+    ))
+    db.commit()
+    return {"status": "clean", "message": "Database reset to clean state."}
+
+def seed_demo_scenario(db: Session):
+    """Explicit opt-in helper to populate a synthetic breach incident for demonstration."""
+    now = datetime.now(timezone.utc)
     risk_info = calculate_explainable_risk(
-        r_rule=75.0,
-        s_behavior=68.0,
+        r_rule=85.0,
+        s_behavior=78.0,
         c_correlation=80.0,
         a_criticality=100.0,
         b_impact=88.0
     )
 
-    seed_incident = Incident(
-        id="INC-1042",
-        title="Correlated Credential Compromise & Recon Sweep",
-        description="Automated multi-layer detection flagged 12 failed authentication attempts followed by a successful login from Romanian IP 194.26.29.114 on Admin Auth Gateway.",
+    demo_inc = Incident(
+        id="INC-DEMO-101",
+        title="[DEMO] Correlated Credential Compromise & Exfil Spike",
+        description="[SYNTHETIC DEMO DATA] Automated 3-layer detection flagged authentication burst from Romanian IP 194.26.29.114 followed by off-hours data exfiltration.",
         severity="CRITICAL",
         risk_score=risk_info["composite_risk_score"],
         status="OPEN",
-        detected_at=now - timedelta(minutes=45),
-        first_seen=now - timedelta(minutes=50),
-        last_seen=now - timedelta(minutes=45),
-        affected_asset="Admin Identity & Auth Gateway",
-        affected_user="finance_admin",
-        attack_category="Credential Access",
+        detected_at=now - timedelta(minutes=15),
+        first_seen=now - timedelta(minutes=25),
+        last_seen=now - timedelta(minutes=15),
+        affected_asset="Customer Financial Database",
+        affected_user="sarah_connor",
+        attack_category="Credential Access & Exfiltration",
         business_impact="CRITICAL",
-        confidence=0.91,
-        correlation_group="CORR-AUTH-194.26.29.114",
-        event_ids=["EV-SEED-01", "EV-SEED-02", "EV-SEED-03", "EV-SEED-04", "EV-SEED-05"],
+        confidence=0.92,
+        correlation_group="CORR-DEMO-194.26.29.114",
+        event_ids=["EV-DEMO-01", "EV-DEMO-02", "EV-DEMO-03"],
         risk_breakdown=risk_info,
-        ai_summary="Observed rapid failed authentication bursts targeting finance_admin followed immediately by successful admin session instantiation from an anomalous Romanian IP range.",
-        ai_hypothesis="Probable distributed credential stuffing or password spray attack achieving valid initial session authentication.",
-        ai_alternative="Legitimate executive remote login through unapproved VPN or foreign travel roaming.",
-        ai_missing_evidence="Host-level endpoint process logs confirming whether local credential dumping occurred.",
-        recommended_action="Simulate temporary session revocation and mandate Out-of-Band MFA re-verification for user finance_admin."
+        ai_summary="Observed rapid authentication failures followed by admin login and 2.8 GB outbound egress transfer to external IP.",
+        ai_hypothesis="Probable stolen session credential followed by unauthorized customer database dump.",
+        ai_alternative="Authorized remote disaster recovery export by senior DBA.",
+        ai_missing_evidence="Database query logs confirming exact tables accessed during session.",
+        recommended_action="Revoke active user session and mandate immediate password reset.",
+        created_at=now - timedelta(minutes=15),
+        updated_at=now - timedelta(minutes=15)
     )
-    db.add(seed_incident)
+    db.add(demo_inc)
 
-    # 6. Seed Events
-    seed_events = [
+    events = [
         SecurityEvent(
-            id=f"EV-SEED-0{i}",
-            timestamp=now - timedelta(minutes=50 - i),
-            source="auth_service",
-            user_id="finance_admin",
+            id="EV-DEMO-01",
+            timestamp=now - timedelta(minutes=25),
+            source="auth_gateway",
+            user_id="sarah_connor",
             asset_id="ASSET_AUTH_PORTAL",
             source_ip="194.26.29.114",
-            event_type="LOGIN_FAILED" if i < 5 else "LOGIN_SUCCESS",
+            event_type="LOGIN_FAILED",
             action="LOGIN",
-            status="FAILURE" if i < 5 else "SUCCESS",
+            status="FAILURE",
             endpoint="/api/v1/auth/login",
-            device_id="Unknown-Linux-Node",
             location="Bucharest, RO",
-            bytes_transferred=1024 * i,
-            event_metadata={"seed": True, "attempt": i}
-        ) for i in range(1, 6)
+            bytes_transferred=1024,
+            event_metadata={"demo": True, "attempt": 1}
+        ),
+        SecurityEvent(
+            id="EV-DEMO-02",
+            timestamp=now - timedelta(minutes=20),
+            source="auth_gateway",
+            user_id="sarah_connor",
+            asset_id="ASSET_AUTH_PORTAL",
+            source_ip="194.26.29.114",
+            event_type="LOGIN_SUCCESS",
+            action="LOGIN",
+            status="SUCCESS",
+            endpoint="/api/v1/auth/login",
+            location="Bucharest, RO",
+            bytes_transferred=2048,
+            event_metadata={"demo": True, "mfa": False}
+        ),
+        SecurityEvent(
+            id="EV-DEMO-03",
+            timestamp=now - timedelta(minutes=15),
+            source="database_proxy",
+            user_id="sarah_connor",
+            asset_id="ASSET_CUSTOMER_DB",
+            source_ip="194.26.29.114",
+            event_type="DATA_EGRESS",
+            action="SQL_DUMP",
+            status="SUCCESS",
+            endpoint="/api/v1/data/export",
+            location="Bucharest, RO",
+            bytes_transferred=2800000000,
+            event_metadata={"demo": True, "query": "SELECT * FROM customer_financial_records", "rows": 450000}
+        )
     ]
-    for e in seed_events:
+    for e in events:
         db.add(e)
 
-    # 7. Initial Audit Log
     db.add(AuditLog(
-        id="AUD-INIT-01",
-        timestamp=now - timedelta(minutes=40),
-        actor="SentinelEdge Detection Engine",
+        id="AUD-DEMO-01",
+        timestamp=now - timedelta(minutes=15),
+        actor="SentinelEdge Simulation Engine",
         role="System",
-        action="INCIDENT_CORRELATED_AUTO",
-        resource="Incident #INC-1042",
-        before_state={"status": "NO_INCIDENT"},
-        after_state={"status": "OPEN", "risk_score": risk_info["composite_risk_score"]},
-        reason="Automated detection engine correlated 5 events into Incident INC-1042."
+        action="DEMO_SCENARIO_LOADED",
+        resource="Incident/INC-DEMO-101",
+        reason="User explicitly requested demo breach scenario loading."
     ))
-
     db.commit()
-    print("Database seeded with realistic baseline assets, users, backups, settings, events, and seed incident.")
+    return {"status": "success", "incident_id": "INC-DEMO-101"}

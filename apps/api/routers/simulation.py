@@ -10,6 +10,7 @@ from apps.api.models.user import UserEntity
 from apps.api.models.setting import SystemSetting
 from apps.api.models.audit import AuditLog
 from apps.api.seeder.scenarios import SCENARIO_TEMPLATES
+from apps.api.seeder.seed_db import reset_to_clean_state, seed_demo_scenario
 from apps.api.engine.rules import evaluate_all_rules, DEFAULT_RULES
 from apps.api.engine.anomaly import evaluate_user_behavior
 from apps.api.engine.correlation import EventCorrelator
@@ -33,6 +34,16 @@ def get_scenarios():
             "target_user": s["target_user_id"]
         } for key, s in SCENARIO_TEMPLATES.items()
     ]
+
+@router.post("/reset")
+def reset_database(db: Session = Depends(get_db)):
+    """Resets the database to a clean 0-breach state (purges all events, incidents, and audit logs)."""
+    return reset_to_clean_state(db)
+
+@router.post("/seed-demo")
+def seed_demo(db: Session = Depends(get_db)):
+    """Explicitly seeds a synthetic breach scenario for testing and demonstration."""
+    return seed_demo_scenario(db)
 
 @router.post("/run")
 async def run_scenario(payload: dict = Body(...), db: Session = Depends(get_db)):
@@ -168,6 +179,7 @@ async def run_scenario(payload: dict = Body(...), db: Session = Depends(get_db))
 
     ai_analysis = await AIInvestigatorService.investigate_incident(evidence_package)
 
+    now_utc = datetime.now(timezone.utc)
     new_incident = Incident(
         id=inc_id,
         title=incident_title,
@@ -175,7 +187,7 @@ async def run_scenario(payload: dict = Body(...), db: Session = Depends(get_db))
         severity=risk_breakdown["severity_band"],
         risk_score=risk_breakdown["composite_risk_score"],
         status="OPEN",
-        detected_at=now,
+        detected_at=now_utc,
         first_seen=created_events[0].timestamp,
         last_seen=created_events[-1].timestamp,
         affected_asset=asset_name,
@@ -190,14 +202,16 @@ async def run_scenario(payload: dict = Body(...), db: Session = Depends(get_db))
         ai_hypothesis=ai_analysis.get("primary_hypothesis"),
         ai_alternative=ai_analysis.get("alternative_explanation"),
         ai_missing_evidence=ai_analysis.get("missing_evidence"),
-        recommended_action=ai_analysis.get("recommended_actions", ["Acknowledge incident and review telemetry."])[0]
+        recommended_action=ai_analysis.get("recommended_actions", ["Acknowledge incident and review telemetry."])[0],
+        created_at=now_utc,
+        updated_at=now_utc
     )
     db.add(new_incident)
 
     # 9. Audit log entry
     db.add(AuditLog(
         id=f"AUD-{uuid.uuid4().hex[:8].upper()}",
-        timestamp=now,
+        timestamp=now_utc,
         actor="Simulation Engine",
         role="System",
         action="SCENARIO_EXECUTED",

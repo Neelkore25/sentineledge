@@ -127,9 +127,17 @@ export default function SimulationLabPage() {
         rule_matches: res.rule_matches || [],
         incident_id: res.incident_id
       });
-      triggerRefresh();
     } catch (err: any) {
-      setJsonError(`Scan failed: ${err.message || err}`);
+      let errMsg = err.message || 'Failed to scan telemetry';
+      if (typeof errMsg === 'string' && errMsg.includes('"msg":')) {
+        try {
+          const parsedErr = JSON.parse(errMsg);
+          if (Array.isArray(parsedErr) && parsedErr.length > 0) {
+            errMsg = `Telemetry Validation Error: ${parsedErr[0].msg} for field '${parsedErr[0].loc?.slice(1)?.join('.') || 'payload'}'`;
+          }
+        } catch {}
+      }
+      setJsonError(`Scan failed: ${errMsg}`);
     } finally {
       setIsScanningJson(false);
     }
